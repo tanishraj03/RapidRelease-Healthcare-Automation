@@ -1,0 +1,153 @@
+{
+  "name": "RapidRelease Healthcare Dispatch",
+  "nodes": [
+    {
+      "parameters": {},
+      "name": "Trigger: Doctor Marks Discharge",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [\n  {\n    json: {\n      \"PatientID\": \"PAT-8892\",\n      \"BedID\": \"302-A\",\n      \"DoctorNotes\": \"Pt stable afebrile for 24hrs. Chest clear. Saturation 98% on room air. Plan discharge. Continue Augmentin 625mg for 5 days.\",\n      \"InsuranceType\": \"TPA-Corporate\",\n      \"DischargeTime\": \"10:15 AM\"\n    }\n  }\n];"
+      },
+      "name": "Mock EMR Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        450,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// SIMULATING AI AGENT\n// Input: Messy Doctor Notes\n// Output: Structured Insurance Justification\n\nconst notes = $input.all()[0].json.DoctorNotes;\n\n// In a real scenario, this would be an OpenAI/Gemini Node\nconst aiGeneratedJustification = `Clinical Justification for Discharge:\\n1. Patient is hemodynamically stable and afebrile (24hrs).\\n2. Respiratory status: 98% SpO2 on Room Air.\\n3. Medication plan: Oral antibiotics prescribed.\\nRecommendation: Fit for home care.`;\n\nreturn {\n  json: {\n    ...$input.all()[0].json,\n    \"AI_Justification_Draft\": aiGeneratedJustification,\n    \"Status\": \"Ready for Billing\"\n  }\n};\n"
+      },
+      "name": "AI Agent: Draft Insurance Claim",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [
+        650,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.InsuranceType }}",
+              "operation": "contains",
+              "value2": "TPA"
+            }
+          ]
+        }
+      },
+      "name": "Router: Insurance vs Cash",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        850,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "message": "=🚨 *Priority Billing Alert* 🚨\nPatient: {{ $json.PatientID }} (Bed {{ $json.BedID }})\nStatus: Insurance TPA\n\n*AI Drafted Justification:*\n{{ $json.AI_Justification_Draft }}\n\nAction: Upload to TPA Portal immediately."
+      },
+      "name": "Slack: Billing Team",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        200
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "message": "=🧹 *Housekeeping Pre-Alert* 🧹\nBed {{ $json.BedID }} will be vacant in approx 2 hours.\nPlease keep staff ready on Floor 3."
+      },
+      "name": "Slack: Housekeeping",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 1,
+      "position": [
+        1100,
+        400
+      ],
+      "credentials": {
+        "slackApi": {
+          "id": "YOUR_CREDENTIAL_ID",
+          "name": "Slack account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Trigger: Doctor Marks Discharge": {
+      "main": [
+        [
+          {
+            "node": "Mock EMR Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mock EMR Data": {
+      "main": [
+        [
+          {
+            "node": "AI Agent: Draft Insurance Claim",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent: Draft Insurance Claim": {
+      "main": [
+        [
+          {
+            "node": "Router: Insurance vs Cash",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Router: Insurance vs Cash": {
+      "main": [
+        [
+          {
+            "node": "Slack: Billing Team",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Slack: Housekeeping",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Slack: Housekeeping",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
